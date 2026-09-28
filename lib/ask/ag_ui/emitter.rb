@@ -22,9 +22,9 @@ module Ask
     #
     # * `TurnStart` / `SessionStart` → `RUN_STARTED` (first one wins)
     # * `TextDelta` (`content`) → `TEXT_MESSAGE_START`, then
-    #   `TEXT_MESSAGE_CONTENT` per delta (empty or whitespace-only deltas are
-    #   dropped — a space is content, so only blank chunks go), then
-    #   `TEXT_MESSAGE_END` on `MessageEnd`
+    #   `TEXT_MESSAGE_CONTENT` per delta (only empty deltas are dropped — a
+    #   space is content, and dropping it would fuse the words around it),
+    #   then `TEXT_MESSAGE_END` on `MessageEnd`
     # * `ThinkingDelta` (`content`) → `REASONING_START` →
     #   `REASONING_MESSAGE_START` → `REASONING_MESSAGE_CONTENT` per delta
     #   (empty deltas dropped) → `REASONING_MESSAGE_END` → `REASONING_END`
@@ -161,7 +161,7 @@ module Ask
       def handle_text_delta(event)
         frames = start
         delta = event.respond_to?(:content) ? event.content : nil
-        return frames if delta.to_s.strip.empty?
+        return frames if delta.to_s.empty?
 
         unless @text_message_id
           @text_message_id = SecureRandom.uuid

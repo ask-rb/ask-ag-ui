@@ -102,16 +102,27 @@ class EmitterTest < Minitest::Test
     assert_equal "assistant", started.first["role"]
   end
 
-  def test_text_drops_empty_and_whitespace_only_deltas
+  def test_text_drops_only_empty_deltas
     emitter = new_emitter
     drive(emitter, AgentEvents::TurnStart.new)
 
     assert_equal [], drive(emitter, AgentEvents::TextDelta.new(content: ""))
     assert_equal [], drive(emitter, AgentEvents::TextDelta.new(content: nil))
-    assert_equal [], drive(emitter, AgentEvents::TextDelta.new(content: "   "))
 
     # Nothing opened, so there is nothing to close either.
     assert_equal [], drive(emitter, AgentEvents::MessageEnd.new(tool_calls: false))
+
+    # A single space is content: it is emitted in order, so the joined
+    # text keeps the space ("due 45 days", never "due45 days").
+    first = drive(emitter, AgentEvents::TextDelta.new(content: "due"))
+    space = drive(emitter, AgentEvents::TextDelta.new(content: " "))
+    last = drive(emitter, AgentEvents::TextDelta.new(content: "45 days"))
+
+    assert_equal ["TEXT_MESSAGE_START", "TEXT_MESSAGE_CONTENT"], first.map { |p| p["type"] }
+    assert_equal ["TEXT_MESSAGE_CONTENT"], space.map { |p| p["type"] }
+    assert_equal " ", space.first["delta"]
+    assert_equal ["TEXT_MESSAGE_CONTENT"], last.map { |p| p["type"] }
+    assert_equal "due 45 days", (first + space + last).select { |p| p["type"] == "TEXT_MESSAGE_CONTENT" }.map { |p| p["delta"] }.join
   end
 
   def test_text_stream_opens_the_run_when_turn_start_was_skipped

@@ -44,7 +44,7 @@ ask-agent internals:
 | Agent event | AG-UI events |
 |---|---|
 | `TurnStart` | `RUN_STARTED` |
-| `TextDelta` | `TEXT_MESSAGE_START` → `TEXT_MESSAGE_CONTENT` → `TEXT_MESSAGE_END` (empty/blank deltas dropped) |
+| `TextDelta` | `TEXT_MESSAGE_START` → `TEXT_MESSAGE_CONTENT` → `TEXT_MESSAGE_END` (only empty deltas dropped — a space is content) |
 | `ThinkingDelta` | `REASONING_START` → `REASONING_MESSAGE_START` → `REASONING_MESSAGE_CONTENT` → `REASONING_MESSAGE_END` → `REASONING_END` (empty deltas dropped) |
 | `ToolCallDelta`, `ToolExecutionStart`, `ToolExecutionEnd` | `TOOL_CALL_START` → `TOOL_CALL_ARGS` → `TOOL_CALL_END` → `TOOL_CALL_RESULT` (empty args deltas dropped) |
 | `SessionEnd` / `#finish` | `RUN_FINISHED` |
