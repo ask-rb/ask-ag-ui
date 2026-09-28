@@ -5,6 +5,8 @@ the keep-a-changelog format.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-09-29
+
 ### Added
 
 - `Ask::AGUI::Emitter#custom_name` — the public seam for a host that names
