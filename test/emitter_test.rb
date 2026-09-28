@@ -21,6 +21,18 @@ module AgentEvents
 
   # App-defined state the gem must know nothing about.
   TodoUpdated = Data.define(:todos)
+  VisitorAway = Data.define(:since)
+  CheckoutClosed = Data.define(:total)
+end
+
+# A host that has a state vocabulary of its own, overriding the public
+# {#custom_name} hook — no private method reached into.
+class ChatEmitter < Ask::AGUI::Emitter
+  NAMES = { "VisitorAway" => "resting" }
+
+  def custom_name(event)
+    NAMES.fetch(event.class.name.split("::").last) { super }
+  end
 end
 
 # Covers Ask::AGUI::Emitter: every ask-agent → AG-UI mapping, the
@@ -309,6 +321,66 @@ class EmitterTest < Minitest::Test
     assert_equal ["CUSTOM"], payloads.map { |p| p["type"] }
     assert_equal "TodoUpdated", payloads.first["name"]
     assert_equal({ "todos" => [{ "id" => "1", "content" => "write it" }] }, payloads.first["value"])
+  end
+
+  def test_custom_names_rename_the_kinds_the_host_named
+    emitter = new_emitter(custom_names: { VisitorAway: :resting, "CheckoutClosed" => "visitor_spent" })
+    drive(emitter, AgentEvents::TurnStart.new)
+
+    away = drive(emitter, AgentEvents::VisitorAway.new(since: 12))
+    assert_equal ["CUSTOM"], away.map { |p| p["type"] }
+    assert_equal "resting", away.first["name"]
+    assert_equal({ "since" => 12 }, away.first["value"])
+
+    closed = drive(emitter, AgentEvents::CheckoutClosed.new(total: 42.0))
+    assert_equal "visitor_spent", closed.first["name"]
+    assert_equal({ "total" => 42.0 }, closed.first["value"])
+  end
+
+  def test_events_the_host_did_not_name_keep_the_default_custom_name
+    emitter = new_emitter(custom_names: { "VisitorAway" => "resting" })
+    drive(emitter, AgentEvents::TurnStart.new)
+
+    payloads = drive(emitter, AgentEvents::TodoUpdated.new(todos: []))
+    assert_equal ["CUSTOM"], payloads.map { |p| p["type"] }
+    assert_equal "TodoUpdated", payloads.first["name"]
+
+    # A name that carries nothing is no name: it falls back like any
+    # other unnamed kind rather than putting "" on the wire.
+    blank = new_emitter(custom_names: { "VisitorAway" => "" })
+    drive(blank, AgentEvents::TurnStart.new)
+    assert_equal "VisitorAway", drive(blank, AgentEvents::VisitorAway.new(since: 1)).first["name"]
+  end
+
+  def test_custom_name_is_a_public_hook_a_host_can_override
+    emitter = ChatEmitter.new(thread_id: "thread-1", run_id: "run-1")
+    drive(emitter, AgentEvents::TurnStart.new)
+
+    named = drive(emitter, AgentEvents::VisitorAway.new(since: 3))
+    assert_equal "resting", named.first["name"]
+
+    # The override falls through to the gem's default for anything else.
+    unnamed = drive(emitter, AgentEvents::CheckoutClosed.new(total: 7.0))
+    assert_equal "CheckoutClosed", unnamed.first["name"]
+
+    assert_respond_to emitter, :custom_name
+  end
+
+  def test_custom_naming_never_moves_the_event_mapping
+    emitter = ChatEmitter.new(thread_id: "thread-1", run_id: "run-1")
+    payloads = []
+    payloads += drive(emitter, AgentEvents::TurnStart.new)
+    payloads += drive(emitter, AgentEvents::TextDelta.new(content: "Hi"))
+    payloads += drive(emitter, AgentEvents::VisitorAway.new(since: 1))
+    payloads += drive(emitter, AgentEvents::MessageEnd.new(tool_calls: false))
+
+    assert_equal [
+      "RUN_STARTED",
+      "TEXT_MESSAGE_START", "TEXT_MESSAGE_CONTENT",
+      "CUSTOM",
+      "TEXT_MESSAGE_END"
+    ], payloads.map { |p| p["type"] }
+    assert_equal "resting", payloads[3]["name"]
   end
 
   def test_full_turn_end_to_end

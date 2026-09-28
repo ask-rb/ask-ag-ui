@@ -39,7 +39,9 @@ module Ask
     #   `RUN_ERROR`. {#finish} and {#fail} drive the same endings manually.
     # * Anything else rides one generic `CUSTOM` passthrough
     #   (`name` = event class name, `value` = its `to_h`): the emitter knows
-    #   nothing about any chat application's specific states.
+    #   nothing about any chat application's specific states. A host with
+    #   its own state vocabulary renames those frames by overriding
+    #   {#custom_name} — no private method to reach for.
     #
     # `MessageEnd` and `TurnEnd` carry no AG-UI counterpart of their own —
     # they only close whatever text, reasoning, or tool call is still open.
@@ -60,7 +62,10 @@ module Ask
       # @param messages [Array<AgUiProtocol::Core::Types::BaseMessage,
       #   AgUiProtocol::Core::Types::ActivityMessage>] input messages carried
       #   on the RUN_STARTED event.
-      def initialize(thread_id:, run_id:, messages: [])
+      # @param custom_names [Hash] the host's own `CUSTOM` frame names, keyed
+      #   by the event's class name (`"VisitorAway" => "resting"`). Events
+      #   left out keep the default. See {#custom_name}.
+      def initialize(thread_id:, run_id:, messages: [], custom_names: {})
         @thread_id = thread_id
         @run_id = run_id
         @input = AgUiProtocol::Core::Types::RunAgentInput.new(
@@ -72,6 +77,7 @@ module Ask
           context: [],
           forwarded_props: {}
         )
+        @custom_names = normalize_custom_names(custom_names)
         @encoder = AgUiProtocol::Encoder::EventEncoder.new
         @started = false
         @terminal = false
@@ -147,7 +153,53 @@ module Ask
         fail_with(reason)
       end
 
+      # The `CUSTOM` frame name an app-defined event rides as.
+      #
+      # This is the seam for a host that has a state vocabulary of its own —
+      # a chat page reading "resting", "done", "visitor_spent" instead of
+      # the event classes. Two ways in, both public:
+      #
+      #   # 1. name the kinds you know, at construction:
+      #   emitter = Ask::AGUI::Emitter.new(thread_id: "t1", run_id: "r1",
+      #     custom_names: { "VisitorAway" => "resting", "CheckoutClosed" => "visitor_spent" })
+      #
+      #   # 2. override this method when the name is computed:
+      #   class ChatEmitter < Ask::AGUI::Emitter
+      #     NAMES = { "VisitorAway" => "resting" }
+      #
+      #     def custom_name(event)
+      #       NAMES.fetch(event.class.name.split("::").last) { super }
+      #     end
+      #   end
+      #
+      # Either way only the frame's `name` changes: the event still rides
+      # one `CUSTOM` frame with its `to_h` as the value, and the rest of
+      # the vocabulary is untouched. An event nobody names — or a name that
+      # comes back nil or empty — falls back to the event's class name, so
+      # the default is exactly what it is without any of this.
+      #
+      # @param event [Object] the app-defined event about to ride a frame.
+      # @return [String] the `name` that frame carries.
+      def custom_name(event)
+        name = event_name(event)
+        custom = @custom_names[name]
+        custom.to_s.empty? ? name : custom.to_s
+      end
+
       private
+
+      # The host's names, keyed by event class name, normalized once so
+      # `{ VisitorAway: :resting }` reads like `{ "VisitorAway" => "resting" }`.
+      def normalize_custom_names(custom_names)
+        custom_names.to_h { |kind, name| [kind.to_s, name.to_s] }.freeze
+      end
+
+      # The key the emitter matches an event by — the event's demodulized
+      # class name. Internal: renaming a `CUSTOM` frame is {#custom_name}'s
+      # job, and renaming the vocabulary would move the mapping itself.
+      def event_name(event)
+        event.class.name.to_s.split("::").last
+      end
 
       def fail_with(reason)
         frames = close_open_messages
@@ -229,7 +281,7 @@ module Ask
       def handle_custom(event)
         value = event.respond_to?(:to_h) ? event.to_h : {}
         value = {} if value.nil?
-        [encode(AgUiProtocol::Core::Events::CustomEvent.new(name: event_name(event), value: value))]
+        [encode(AgUiProtocol::Core::Events::CustomEvent.new(name: custom_name(event), value: value))]
       end
 
       def close_open_messages
@@ -262,10 +314,6 @@ module Ask
 
       def encode(event)
         @encoder.encode(event)
-      end
-
-      def event_name(event)
-        event.class.name.to_s.split("::").last
       end
 
       def event_id(event)

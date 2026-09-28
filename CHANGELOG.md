@@ -5,6 +5,17 @@ the keep-a-changelog format.
 
 ## [Unreleased]
 
+### Added
+
+- `Ask::AGUI::Emitter#custom_name` — the public seam for a host that names
+  its own `CUSTOM` frames. Pass `custom_names:` to the constructor
+  (`{ "VisitorAway" => "resting" }`) or override the method; either way the
+  frame's `name` changes and the event still rides one `CUSTOM` frame with
+  its `to_h` as the value. The default is unchanged — a `CUSTOM` frame
+  named after the event's class — and events nobody named keep riding that
+  default path. A host no longer has to subclass the emitter and override
+  the private `event_name` method to get there.
+
 ## [0.1.0] — 2026-09-28
 
 ### Added

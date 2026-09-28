@@ -49,10 +49,41 @@ ask-agent internals:
 | `ToolCallDelta`, `ToolExecutionStart`, `ToolExecutionEnd` | `TOOL_CALL_START` → `TOOL_CALL_ARGS` → `TOOL_CALL_END` → `TOOL_CALL_RESULT` (empty args deltas dropped) |
 | `SessionEnd` / `#finish` | `RUN_FINISHED` |
 | `Error` / `#fail` | `RUN_ERROR` |
-| anything else | one generic `CUSTOM` passthrough (`name` + `value`) |
+| anything else | one generic `CUSTOM` passthrough (`name` + `value`), named after the event's class — [rename it](#naming-your-own-custom-frames) |
 
 Every frame is built with `AgUiProtocol::Core::Events::*` and encoded with
 `AgUiProtocol::Encoder::EventEncoder` — event JSON is never hand-rolled.
+
+### Naming your own CUSTOM frames
+
+A host whose states are not event class names — a chat page reading
+`resting`, `done`, `visitor_spent` — says so through the public
+`#custom_name` hook, never by reaching into a private method. Name the
+kinds you know with the `custom_names:` constructor option:
+
+```ruby
+emitter = Ask::AGUI::Emitter.new(
+  thread_id: "t1", run_id: "r1",
+  custom_names: { "VisitorAway" => "resting", "CheckoutClosed" => "visitor_spent" }
+)
+```
+
+or override the method when the name is computed:
+
+```ruby
+class ChatEmitter < Ask::AGUI::Emitter
+  NAMES = { "VisitorAway" => "resting" }
+
+  def custom_name(event)
+    NAMES.fetch(event.class.name.split("::").last) { super }
+  end
+end
+```
+
+Either way only the frame's `name` changes: the event still rides one
+`CUSTOM` frame with its `to_h` as the value, and the vocabulary above is
+untouched. Events nobody names keep the class-name default, so the
+passthrough is exactly what it is without any of this.
 
 ## Mounting: `Ask::AGUI::Server`
 
