@@ -2,6 +2,9 @@
 
 require_relative "ag_ui/version"
 require_relative "ag_ui/emitter"
+require_relative "ag_ui/run_store"
+require_relative "ag_ui/run"
+require_relative "ag_ui/server"
 
 # Namespace for the AG-UI (Agent-User Interaction) protocol server.
 #

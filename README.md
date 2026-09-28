@@ -54,6 +54,57 @@ ask-agent internals:
 Every frame is built with `AgUiProtocol::Core::Events::*` and encoded with
 `AgUiProtocol::Encoder::EventEncoder` — event JSON is never hand-rolled.
 
+## Mounting: `Ask::AGUI::Server`
+
+The server is the conventional Rack surface AG-UI clients expect. The host
+owns the agent and answers agent events; the gem owns the socket, the
+framing, and one `Emitter` per run. Plain Rack 3 with an enumerable body —
+it runs under any Rack server, with no Rails, ask-agent, or async
+dependency.
+
+```ruby
+require "ask-ag-ui"
+
+app = Ask::AGUI::Server.new(agent_id: "default") do |run|
+  # run.thread_id, run.run_id, run.messages, run.tools,
+  # run.context, run.forwarded_props — answer agent events:
+  [TurnStart.new, TextDelta.new(content: "Hello")]
+end
+```
+
+Rackup:
+
+```ruby
+# config.ru
+require "ask-ag-ui"
+
+run Ask::AGUI::Server.new(agent_id: "default") { |run| MyAgent.events_for(run) }
+```
+
+Rails:
+
+```ruby
+# config/routes.rb
+mount Ask::AGUI::Server.new(agent_id: "default") { |run| MyAgent.events_for(run) },
+  at: "/api/copilotkit"
+```
+
+Routes: `GET /info`, `POST /agent/:id/run` (SSE), `POST /agent/:id/connect`
+(replays recorded frames, or an immediately-completed empty stream when
+there is nothing to replay), `POST /agent/:id/stop/:thread_id` (JSON ack).
+Malformed run input answers `400` with a JSON error body.
+
+One curl example (run a thread through the stub above):
+
+```
+curl -N -X POST http://localhost:9292/agent/default/run \
+  -H 'Content-Type: application/json' \
+  -d '{"threadId":"t1","runId":"r1","messages":[{"id":"u1","role":"user","content":"Hi"}],"tools":[],"context":[]}'
+```
+
+The in-memory run store keeps frames in this process only — replay and
+stop need a shared store once you run more than one process.
+
 ## Development
 
 ```
