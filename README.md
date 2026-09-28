@@ -112,6 +112,14 @@ bundle install
 bundle exec rake test
 ```
 
+The suite validates every emitted SSE frame against the AG-UI protocol's
+canonical JSON Schema, vendored at `test/fixtures/ag_ui.json` (generated
+from the reference Python SDK; the copy came from the reference
+implementation's `data/ag_ui.json`). See `test/fixtures/README.md` for
+provenance and refresh instructions. The fixture resolves through a
+repo-relative path, so a fresh clone needs nothing outside the repo — and
+a missing fixture fails loudly (`ENOENT`) rather than skipping validation.
+
 ## License
 
 MIT

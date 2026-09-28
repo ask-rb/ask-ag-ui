@@ -28,7 +28,7 @@ end
 # emitted frame is parsed and validated against the protocol JSON Schema,
 # so hand-rolled JSON can never sneak onto the wire.
 class EmitterTest < Minitest::Test
-  SCHEMA_PATH = ENV.fetch("AG_UI_SCHEMA_PATH", "/Users/kaka/Code/ask-rb/refs/ag-ui/data/ag_ui.json")
+  SCHEMA_PATH = AG_UI_SCHEMA_PATH
 
   def schema
     @schema ||= JSON.parse(File.read(SCHEMA_PATH))
