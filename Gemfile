@@ -6,5 +6,6 @@ group :test do
   gem "minitest", "~> 5.25"
   gem "mocha", "~> 3.1"
   gem "rake", "~> 13.0"
+  gem "json_schemer", "~> 2.5"
   gem "simplecov", "~> 0.22"
 end
