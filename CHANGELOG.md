@@ -5,6 +5,8 @@ the keep-a-changelog format.
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-09-28
+
 ### Added
 
 - `Ask::AGUI::Emitter` — the seam that turns ask-rb agent/session events
